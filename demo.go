@@ -4,6 +4,8 @@ import (
 	"unsafe"
 	"math"
 	"strconv"
+	"strings"
+	"errors"
 )
 
 func main() {
@@ -17,6 +19,9 @@ func main() {
 	arraysInGo()
 	slicesInGo()
 	mapsInGo()
+	funcsInGo()
+	structsInGo()
+	interfacesInGo()
 }
 
 func variablesInGo() {
@@ -312,6 +317,159 @@ func mapsInGo() {
 		} 
 	}
 	fmt.Println(divisibility)
+}
+
+func funcsInGo() {
+	// Similar to any other statically typed language, need to specify the data types for the func parameters and the return
+	addFunc := func(x int, y int) int {
+		return x + y
+	}
+	fmt.Println(addFunc(2, 3))
+
+	// Functions in Go can return multiple data values, unlike C
+
+	splitFullName := func(fullname string) (string, string, error) {
+		names := strings.Fields(fullname)
+		if len(names) < 2 {
+			return "", "", errors.New("The given name cannot be split")
+		}
+		return names[0], names[1], nil
+	}
+	first, last, err := splitFullName("John Doe")
+	if err == nil {
+		fmt.Printf("First name: %s, Last name: %s\n", first, last)
+	}
+
+	// Passing functions as arguments to other functions
+
+	squareFunc := func(num int) int { return num * num }
+
+	operationHandler := func(callable func(int) int, value int) int {		
+		return callable(value)
+	}
+	number := 5
+	numberSquare := operationHandler(squareFunc, number)
+	fmt.Printf("The square of %d is %d\n", number, numberSquare)
+
+	// Currying in Go
+	func1 := func(word string) func(string) string {
+		return func(word2 string) string {
+			return word + " " + word2
+		}
+	}
+	chain := func1("Hello")
+	w1 := "world"
+	w2 := "John"
+	fmt.Println(chain(w1))
+	fmt.Println(chain(w2))
+
+	// The spread operator in Go for passing in a variable number of arguments
+
+	sumIter := func(numbers ...int) int {
+		sum := 0
+		for _, num := range numbers {
+			sum += num
+		}
+		return sum
+	}
+	fmt.Printf("The sum of 4, 5, 6 is %d\n", sumIter(4, 5, 6))
+
+	// How to spread an existing array into arguments
+	numsForSum := []int{1,2,3,4,5}
+	fmt.Printf("The sum of %d numbers is %d\n", numsForSum, sumIter(numsForSum...))
+
+	// Named return variables
+
+	mulIter := func(numbers ...int) (result int) {
+		// result is automatically initialised as 0
+		// If a different starting value is needed then only re-initialise it
+		result = 1
+		for _, num := range numbers {
+			result *= num
+		}
+		return
+	}
+	// No need to write "return result" - This is implied based on the function definition
+	fmt.Printf("Product of 3x4x5 is %d\n", mulIter(3, 4, 5))
+}
+
+// Example struct
+type Person struct {
+	name string
+	age int8
+	subjects []Subject
+}
+
+// Getters and setters
+func (p Person) getName() string {
+	return p.name
+}
+
+func (p *Person) setName(newName string) {
+	p.name = newName
+	fmt.Println("Name changed to " + newName)
+}
+
+func (p *Person) addSubject(newSubject Subject) {
+	p.subjects = append(p.subjects, newSubject)
+}
+
+type Subject struct {
+	subjectName string
+	gpa float32
+}
+
+func structsInGo() {
+	// Struct declaration syntax
+
+	person := Person{"John", 17, []Subject{{"Maths", 3.5}}}
+	// Can also initialise structs as key-value pairs name="John", age=17
+	
+	fmt.Printf("The person's name is %s\n", person.getName())
+
+	person.setName("Jimmy")
+	fmt.Printf("Person's name changed to %s\n", person.getName())
+
+	// Composition: struct within a struct
+	person.addSubject(Subject{"English", 3.0})
+	fmt.Println(person.subjects)
+}
+
+type Speaker interface {
+	Speak() string
+}
+
+// Create objects that will implement this interface
+type Dog struct {
+    Name string
+}
+
+func (d Dog) Speak() string {
+    return "Woof! My name is " + d.Name
+}
+
+type Robot struct {
+    Model string
+}
+
+func (r Robot) Speak() string {
+    return "Beep boop. Model " + r.Model + " active."
+}
+
+func interfacesInGo() {
+	// No verbose syntax for implementing interfaces in Go, like Java
+	// Interface implementation is implicit rather than explicit in Go.
+	// As long as you're using all the methods defined in the interface
+
+	introduceOneself := func(s Speaker) {
+		fmt.Println(s.Speak())
+	}
+
+	dog := Dog{"Bruno"}
+	robot := Robot{"C3PO"}
+
+	introduceOneself(dog)
+	introduceOneself(robot)
 }
 
 // Video source of the tutorial: https://youtu.be/V-lI7AmusGs?si=ES7jOhBohipOllcB
