@@ -1,11 +1,14 @@
 package main
+
 import (
+	"errors"
 	"fmt"
-	"unsafe"
 	"math"
 	"strconv"
 	"strings"
-	"errors"
+	"unsafe"
+	"time"
+	"sync"
 )
 
 func main() {
@@ -22,6 +25,11 @@ func main() {
 	funcsInGo()
 	structsInGo()
 	interfacesInGo()
+	errorHandlingGo()
+	genericsInGo()
+	pointersInGo()
+	goRoutines()
+	mutexInGo()
 }
 
 func variablesInGo() {
@@ -470,6 +478,295 @@ func interfacesInGo() {
 
 	introduceOneself(dog)
 	introduceOneself(robot)
+}
+
+func deferredFunc() {
+	fmt.Println("This is a deferred function executed before a panic.")
+	// The error can be captured like a try except block using the recover() method
+	r := recover() // The error message gets stored in this variable 
+	if r == nil {
+		fmt.Println("There is no error")
+	} else {
+		fmt.Println(r)
+		// Code to handle gracious termination can go here
+		fmt.Println("Handling error graciously for expected error. Unexpected errors allowed to propagate.")
+	}
+}
+
+func errorHandlingGo() {
+	// panic is the reserve word used to raise an exception and stop further code execution
+	// If a panic occurs during some form of IO, then how would that be handled graciously in Go?
+	// The answer is to use the 'defer' reserve word.
+	// Defer ensures that certain functions are executed before the Go throws a panic
+	// This is used like a context manager to graciously close files, or DB connections or sockets before the panic
+
+	// defer deferredFunc()
+	// panic("This caused a crash")
+	// x := 5
+	// y := 0
+	// z := x / y
+	// fmt.Println("This will only print if no panic " + fmt.Sprint(z))
+
+	// Raising panics manually is not commonly done.
+	// The recommended approach is to create an Error object from the errors module
+
+	divideFunc := func(a int, b int) (float64, error) {
+		if b == 0 {
+			return 0.0, errors.New("Division by 0 error")
+		}
+		return float64(a) / float64(b), nil
+	}
+
+	result, err := divideFunc(5, 0)
+
+	if err != nil {
+		// Handle error
+		fmt.Println("Following error occurred: " + fmt.Sprint(err))
+	}
+	// The line below will get executed, as error objects do not cause code execution to stop inherently:
+	fmt.Println("No error occurred, code execution can proceed. " + fmt.Sprint(result))
+}
+
+func addGeneric[T int | float64 | uint](x T, y T) T {
+	return x + y
+}
+
+// Rather than writing a long line of data type, can use an interface
+
+type Numbers interface {
+	int | float64 | uint
+}
+
+func subtractGeneric[T Numbers] (x T, y T) T {
+	return x - y
+}
+
+// Using multiple letter representations for different generic data variables
+func getValues[k comparable, v any](mp map[k]v) []v {
+	values := []v{}
+
+	for _, value := range mp {
+		values = append(values, value)
+	}
+	return values
+}
+
+// generic structs
+
+type GenericStruct[T any] struct {
+	value T
+}
+
+func genericsInGo() {
+
+	intSum := addGeneric(2, 3)
+	floatSum := addGeneric(2.5, 3.5)
+	uintSum := addGeneric(2, 4)
+
+	fmt.Println(intSum, floatSum, uintSum)
+
+	subgeneric := subtractGeneric(25, 15)
+	fmt.Printf("25 - 15 = %d\n", subgeneric)
+
+	// Example two
+	exampleMap := map[string]int{
+		"a": 100,
+		"b": 200,
+		"c": 300,
+		"d": 400,
+	}
+	values := getValues(exampleMap)
+	fmt.Println(values)
+
+	struc1 := GenericStruct[string]{"hello"}
+	struc2 := GenericStruct[int]{25}
+	fmt.Println(struc1.value)
+	fmt.Println(struc2.value)
+
+}
+
+type Book struct {
+	id int
+	name string
+}
+
+func (book *Book) setName(newName string) {
+	book.name = newName
+	// No need for '->' to dereference a struct attribute in Go 
+}
+
+func (book *Book) setId(newId int) {
+	(*book).id = newId
+	// Just as example to show that dereferencing a stuct in Go syntactically is the same as C
+}
+
+func pointersInGo() {
+	// Pointers works very much like in C
+	changeValue := func(num *int, newValue int) {
+		*num = newValue
+	}
+
+	num1 := 5
+	changeValue(&num1, 10) // & to access memory address of variable
+	fmt.Printf("The value of num1 was changed to %d\n", num1)
+
+	// Book example
+	book := Book{1, "Title1"}
+	book.setName("Title2")
+	book.setId(25)
+	fmt.Printf("Book details:\nName: %s\nID:%d\n", book.name, book.id)
+}
+
+func asyncAdd(x int, y int, ch chan int) {
+	ch <- x + y
+}
+
+func definedSleep(count int, ch chan string) {
+	time.Sleep(time.Duration(count) * time.Second)
+	// fmt.Printf("Waking up after %d seconds\n", count)
+	ch <- fmt.Sprintf("Sleep complete after %d seconds", count)
+}
+
+// ping is a SEND-ONLY channel (chan<-)
+func ping(pings chan<- string, msg string) {
+    pings <- msg
+    // fmt.Println(<-pings) // <-- This would cause a COMPILE ERROR
+}
+
+// pong is a RECEIVE-ONLY channel (<-chan) for pings
+// and a SEND-ONLY channel for pongs
+func pong(pings <-chan string, pongs chan<- string) {
+    msg := <-pings
+    pongs <- msg
+}
+
+func goRoutines() {
+	ch1 := make(chan int)
+	go asyncAdd(10, 5, ch1)
+
+	x := <-ch1
+	fmt.Printf("The sum 10 + 5 calculated asynchronously: %d\n", x)
+
+	// Multiple routines but only one call to the channel
+	timeChannel := make(chan string)
+	var result string
+	// go definedSleep(4, timeChannel)
+	// go definedSleep(3, timeChannel)
+	// go definedSleep(2, timeChannel)
+	// go definedSleep(1, timeChannel)
+
+	// result = <-timeChannel
+	// fmt.Println(result)
+	// // Only the thread that completed first will be added to the result variable.
+
+	// // Need to add multiple result lines to capture output from all the initiated go routines
+	// result = <-timeChannel
+	// fmt.Println(result) // 2 seconds
+
+	// result = <-timeChannel
+	// fmt.Println(result) // 3 seconds
+	
+	// result = <-timeChannel
+	// fmt.Println(result) // 4 seconds
+	
+	// looping through the routines to capture the output for them all
+	go definedSleep(4, timeChannel)
+	go definedSleep(3, timeChannel)
+	go definedSleep(2, timeChannel)
+	go definedSleep(1, timeChannel)
+
+	fmt.Println("Looping through to capture output of all routines:")
+	for i:= 0; i < 4; i++ {
+		result = <-timeChannel
+		fmt.Println(result)
+	}
+
+	// Using select statement to capture outputs from different channels
+	go asyncAdd(35, 5, ch1)
+	go definedSleep(2, timeChannel)
+
+	for j := 0; j < 2; j++ {
+		select {
+		case addResult := <-ch1:
+			fmt.Println(addResult)
+		case sleepResult := <-timeChannel:
+			fmt.Println(sleepResult)
+		}
+	}
+	// Without using the loop, only the output from the channel whose routine completed first would be captured.
+	// select statement are asynchronous and do not block the execution of the main routine.
+
+	// Directional channels
+	
+	// By default, all channels are bi-directional: data can be sent to the channel and received from the channel
+	// Uni-directional channels can be defined, based on the positioning of the <- with the chan type
+	// <-chan is a receive-only channel
+	// chan<- is a send-only channel
+	// Its considered good practice to call close(channelName) on a send-only channel.
+	// Without closing the sender channel, the receiver channel will go into a deadlock, expecting more data to arrive.
+
+	// Quick example below
+
+	pings := make(chan string, 1)
+    pongs := make(chan string, 1)
+
+    ping(pings, "passed message")
+    pong(pings, pongs)
+
+    fmt.Println(<-pongs)
+
+	// Buffered channels
+
+	// By default, channels have a buffer capacity of 0.
+	// This means that a receiving event cannot happen unless a send event preceded it SIMULTANEOUSLY.
+	// A send event cannot happen, unless a receive event happens to clear out the previous send.
+
+	// By passing in a buffer capacity, we allow for multiple non-blocking send and receive events to occur on the channel.
+	// Send event will ONLY block, if the buffer is full.
+	// Receive event will ONLY block if the buffer is nil.
+
+	ch := make(chan string, 2)
+
+    ch <- "first"
+    ch <- "second"
+    // The buffer is now full. 
+    // Sending a third would cause a block/deadlock here.
+
+    fmt.Println(<-ch)
+    fmt.Println(<-ch)
+}
+
+type Counter struct {
+	value int
+	lock sync.Mutex
+}
+
+func incrementCounter(counter *Counter, wg *sync.WaitGroup) {
+	defer wg.Done() // Notify the wait group that this function is complete
+	
+	counter.lock.Lock()
+	defer counter.lock.Unlock() // Once the operation is succesfully complete or an error is thrown, the lock will always be released
+	counter.value++
+	fmt.Println(counter.value)
+}
+
+func mutexInGo() {
+	// Multiple threads acting on a shared resource will create race conditions
+	// Need to use a mutex
+	counter := Counter{value: 0}
+
+	// To manage multiple threads execution, need to create a task group
+	// This is helpful when you want to await the execution of all tasks in the group
+	// This is done using the WaitGroup method in the sync library
+
+	var routineGroup sync.WaitGroup
+
+	for i := 0; i < 20; i++ {
+		routineGroup.Add(1) // Add takes a delta value
+		go incrementCounter(&counter, &routineGroup)
+	}
+	routineGroup.Wait() // Waits for all 20 threads in the work group to be complete
+	fmt.Println("Final value: ", counter.value)
 }
 
 // Video source of the tutorial: https://youtu.be/V-lI7AmusGs?si=ES7jOhBohipOllcB
